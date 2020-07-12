@@ -1,0 +1,945 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{xcolor}
+\usepackage{bm}
+\usepackage{hyperref}
+\usepackage{xparse}
+\usepackage{mathrsfs}
+
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=blue,
+    citecolor=blue
+}
+
+\newtheorem{thm}{Theorem}
+\newtheorem{bnd}{Bound}
+
+\NewDocumentCommand{\snewtheorem}{m o m}
+ {
+  \IfNoValueTF{#2}
+   {
+    \newtheorem{sec#1}{#3}[section]
+    \newtheorem{subsec#1}{#3}[subsection]
+   }
+   {
+    \newtheorem{sec#1}[sec#2]{#3}
+    \newtheorem{subsec#1}[subsec#2]{#3}
+   }
+  \newenvironment{#1}
+   {\ifnum\value{subsection}>0
+      \csname subsec#1\expandafter\endcsname
+    \else
+      \csname sec#1\expandafter\endcsname
+    \fi}
+   {\ifnum\value{subsection}>0 
+      \csname endsubsec#1\expandafter\endcsname
+    \else
+      \csname endsec#1\expandafter\endcsname
+    \fi}
+}
+
+\snewtheorem{lem}{Lemma}
+\snewtheorem{rmk}{Remark}
+\snewtheorem{cor}{Corollary}
+\snewtheorem{red}{Reduction}
+
+
+\DeclareMathOperator{\minto}{\bm{\mathsf{minto}}}
+\DeclareMathOperator{\minout}{\bm{\mathsf{minout}}}
+\DeclareMathOperator{\out}{\bm{\mathsf{out}}}
+\DeclareMathOperator{\into}{\bm{\mathsf{into}}}
+\DeclareMathOperator{\Conn}{\bm{\mathsf{Conn}}}
+
+\newcommand{\hide}[1]{}
+\newcommand{\edit}[1]{}%\textcolor{red}{#1}}
+\newcommand{\rough}[1]{}%\textbf{\textcolor{blue}{#1}}}
+\definecolor{darkgreen}{RGB}{75,150,75}
+\newcommand{\review}[1]{}%\textcolor{darkgreen}{#1}}
+\newcommand{\dc}[1]{}%\textcolor{orange}{dc: #1}}
+\newcommand{\zh}[1]{}%\textcolor{blue}{zh: #1}}
+
+
+\title{Splitting Paths}
+\author{Zach Hunter}
+\date{October 2019}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+A superpermutation on $k$ letters is a string that contains all $k!$ permutations of these letters as substrings. The problem of determining $L^*(k)$, the shortest length a superpermuation on $k$ letters can be, was originally asked by  Ashlock and Tillotson, (citation acquired)\hide{(Daniel A. Ashlock and Jenett Tillotson. Construction of small superpermutations
+and minimal injective superstrings. Congressus Numerantium,
+93:91–98, 1993.)\dc{ use a ref command and bibliography package (see AMT papers, I don't remember all the syntax)}} who established that $L^*(k) \leq \sum_{i=1}^k i!$ for all $k$. This was later improved by Greg Egan, who showed that $L^*(k) \leq k!+(k-1)!+(k-2)!+(k-3)!+k-4$, inspired by techniques from a paper of Aaron Williams. (citation needed)
+
+In terms of lower bounds, a proof that $L^*(k) \geq k! + (k-1)!+(k-2)! +k-3$ was posted on the anonymous forum 4chan. This was the first significant improvement from the trivial bound $L^*(k) \geq k! +(k-1)!+k-2$, and has since then remained the best known lower bound, until now. (citation needed)
+
+In this paper, we establish a new lower bound that is asymptotically $k!$ times a rational function of $k$. A weaker version of our result, which is easier to compare to the previous lower bound, is
+\[L^*(k) \geq k!+(k-1)!+(k-2)!+(k-4)!-2(k-5)! +O((k-6)!).\]
+More generally, considering bounds of the form
+\[\sum_{i=0}^{j-1} c_i(k-i)! + O((k-j)!),\]
+ with some computation we found the best constants continue like so 
+\[c_0,c_1,\dots = 1,1,1,0,1,-2,7,-32,179,-1182,8993,-77440,744425,-7901410,\dots,\]
+curiously, it seems that $|c_{i+3}| = a(i)$ for the OEIS A265165.
+
+\section{Notation}
+
+\textbf{Basic Graph Notation}
+
+As a convention, for a directed graph $G$, we let $V(G)$ denote its vertex set, and $E(G) \subseteq V(G)^2$ denote its edge set.
+
+\vspace{1.75em}
+
+\textbf{The graph $S_k$} 
+
+Throughout the paper, we use $k$ to denote the number of letters we are doing superpermutations for, and let $S_k$ denote the graph of those permutations. The idea is to turn the superpermutation problem into a traveling salesman problem, an idea which has been in the literature for several years, such as Robin Houston's paper in 2014. (https://arxiv.org/abs/1408.5108) \hide{@misc{houston2014tackling,
+    title={Tackling the Minimal Superpermutation Problem},
+    author={Robin Houston},
+    year={2014},
+    eprint={1408.5108},
+    archivePrefix={arXiv},
+    primaryClass={math.CO}
+}} Since different articles have used slightly different graphs, we define ours here.
+
+Essentially, $S_k$ is a complete loopless digraph where $V(S_k)$ is the set of permutations on $k$ letters, meaning we have the directed edge $(u \to v)$ and $(v \to u)$ for every two distinct vertices $u,v \in V(S_k)$. We then define $w$ as a weight function on $E(S_k)$. Intuitively, $w((u\to v))$ is the minimum number of letters to get from permutation $u$ to permutation $v$. 
+ 
+ More specifically, we let $w((u\to v)) = x$, where $x$ is the smallest non-negative integer, such that the last $k-x$ letters of $u$ match the first $k-x$ letters of $v$, when $u$ and $v$ are written with one-line notation. (i.e. the $(x+i)$-th letter of $u$ is the $i$-th letter of $v$, for $1\le i \le k-x $, which is vacuously true if $x = k$)
+ 
+ \hide{Specifically, we will define $S_k$ through the $k$-dimensional De Bruijn graph on $k$ letters, $G_k$. We define $A_k = \{1,2\dots k\}$ which is intuitively our alphabet. We have that $V(G_k) = A_k^k$, and that for each vertex, $v = [a_1, a_2\dots a_k]$, we have the directed edges $(v \to [a_2, a_3 \dots a_k,b])$, for each $b \in A_k$. We then create a weight $w'$, where $w'(u \to v)$ is the length of the shortest directed path from $u$ to $v$ in $G_k$. We then have that $S_k$ is a directed weighted graph where $V(S_k)$ is the set of permutations of $A_k$, with $w(u \to v) = w'(u \to v)$ for each $u,v \in V(S_k)$.}
+
+We will often refer to an edge of weight $W$ as a $W$-edge. We let $\sigma(v)$ denote using a 1-edge, e.g. $\sigma([1,2,\dots (k-1), k]) = [2,3,\dots k,1]$. Similarly, we let $\tau$ denote using the 2-edge not equal to $\sigma^2$, e.g. $\tau([1,2,\dots (k-1), k]) = [3,4,\dots k,2,1]$.
+
+\vspace{1.75em}
+
+\textbf{Further Graph Notation:} Let $G$ be a subgraph of $S_k$.
+
+We define the weight, $w(G)$, as $\sum_{e \in E(G)} w(e)$.
+
+For a vertex $v \in V(G)$, we let $\out(G,v)$ be the edges of $G$ going out of $v$, which is formally $\{(v\to u), u \in S_k\} \cap E(G)$, likewise, we let $\into(G,v)$ denote the edges of $G$ going into $v$. We further generalize this to sets of vertices, where for $S \subseteq V(G)$, we have $\into(G,S) = \bigcup_{v \in S} \into(G,v)$, and define $\out(G,S)$ in the same manner.
+
+For a graph $G$, we will define $\Conn(G)$\dc{ make this a custom function} as set of the graphs of its connected components. (e.g. if $G$ is a connected graph, $|\Conn(G)| = 1, G \in \Conn(G)$) As shorthand, we will say $|G| = |\Conn(G)|$.
+
+\vspace{1.75em}
+
+\textbf{Path Notation} Given a path $p = v_1,v_2 \dots v_x$, let $p[i] = v_i$. Likewise, we have $p^{-1}[v_i] =i$. For $v \not \in p$, we say $p^{-1}[v] = \infty$. Throughout this paper, all paths will be simple, meaning that no vertex is ``revisited'', i.e. $p[i]\neq p[j]$ for any distinct $i,j$.
+
+We also consider $p$ to be a graph, where $E(p) = \{(p[1] \to p[2]),(p[2] \to p[3])\dots (p[|p|-1] \to p[|p|])\}$.
+
+\vspace{1.75em}
+
+\textbf{minto} We let $\minto(p)$ be $\min\{ w(v \to p[1]), v \not \in p\}$. For a graph $G$ where $\Conn(G)$ is a set of paths, we define $\minto(G)$ as $\sum_{p \in \Conn(G)} \minto(p) - \max_{p \in \Conn(G)}\{\minto(p)\}$.
+
+Equivalently, $\minto(G)$ is the lower bound of $\sum_{p \in S} \minto(p)$, where $S$ is a subset of $\Conn(G)$ missing just one element.
+
+\vspace{1.75em}
+
+\textbf{Exitless paths} Considering a path, $p$, we say we did an \textit{early exit} at a vertex $v \in p$, if we could have used a 1-edge at $v$, but instead used a more expensive edge. More formally, we define $v$ as an early exit of $p$ iff $w(\out(p,v)) > 1$, and $p^{-1}[v] < p^{-1}[\sigma(v)]$.
+
+A path is considered \textit{exitless}, if it has no early exits. Finally, a path is considered \textit{strongly exitless} if it is exitless and $\sigma(p[|p|]) \in p$. (i.e. we can't append a 1-edge onto $p$)
+
+\vspace{1.75em}
+
+\textbf{Other Functions} We define $L(k)$ as the minimum weight of a Hamiltonian path $P$ of $S_k$. We have that $L^*(k) = k+L(k)$, as it takes $k$ letters to write our first permutation, and then $L(k)$ letters to add all subsequent permutations, by definition of $w$.
+
+We also define the function $i(\ell)$, which is implicitly also in terms of $k$. For $\ell \geq 1$, we define $i(\ell)$ as the minimum weight of an exitless path, $p$ on $S_k$ where $p$ has $\ell$ vertices.
+
+\section{An Outline}\edit{ needs a lot of work, sloppy currently; one can potentially find this useful as is, but is}
+
+In Section~\ref{function}, we establish a transformation, $f(P,S)$, that takes a Hamiltonian path $P$, and a set of vertices $S$ to yield a new graph $X$. We then discuss bounding $w(P)$ in terms of $X$ and limited information about $P$.
+
+Then, in Section~\ref{construction}, we define a construction of a set of vertices, $S(P)$ such that, given a Hamiltonian path $P$, we can bound $w(P)$ solely in terms of the resultant $f(P,S(P)) = X$. We further show that $X$ holds a number of other properties.\dc{ ``which are...'' or ``which let us...''}
+
+\edit{summary of section 5 worked better in last version} Building upon Section~\ref{construction}, Section~\ref{reductions} establishes bounds on $L(k)$, which is defined as $L(k) = \min_{P}\{w(P)\}$, over all hamiltonian paths $P$ of $S_k$. In Section~\ref{to subproblems}, we first construct a set $\mathcal{X}_k$ whose elements are path coverings of $S_k$, and prove that:
+
+\textbf{Bound 1}\edit{ use amsthm}
+
+\[ L(k) \geq \min_{X \in \mathcal{X}_k}\left((|\Conn(X)|-1) + \minto(X) + w(X)\right) \]
+\dc{Change definition of $\mathcal{X}$ to be dependent on $k$, so $\mathcal{X}_k$ makes sense.}
+
+We then manipulate this inequality to get \textbf{Bound 2}\dc{ label/ref}, whose statement a too involved to state here. In essence, Bound 2 allows us to bound $L(k)$ by getting lower bounds on two sub-problems, which each concern finding a ``best''\dc{ ?} path in $\bigcup_{X \in \mathcal{X}_k} X$.\dc{ this paragraph is very mysterious and that's bad. You should be either more or less specific than you are now (probably more).}
+
+In Section~\ref{reducing subproblems}, we reduce both sub-problems to bounding the weight of exitless paths of length $|p|$, which we handle in the appendix. Using this result, we quickly get that:
+
+\textbf{Theorem 1}\edit{ amsthm again}\dc{ label/ref since you will most likely state/prove this again later, but do amsthm first obviously}
+
+\[ L(k) \geq \frac{k!-k(k-1)(k-2)}{k(k-1)(k-2)-k}((k+1)(k-1)(k-2)-3) + (k+1)(k-1)(k-2)-5 \]
+
+A weaker version of which is:
+
+\[ L(k) \geq k! +(k-1)!+(k-2)!+(k-4)!-2(k-5)!+O((k-6)!)\]\hide{continues 7(k-6)!-32(k-7)!... list of coefficients: [1,1,1,0,1,-2,7,-32,179,-1182,8993,-77440,744425,-7901410,...]}
+
+
+Finally, in the appendix we get a lower bound on the weight of exitless paths of length $|p|$. Explicitly we get the bound:
+
+\textbf{Theorem 2}\edit{ amsthm; not sure what to classify this result}
+
+\[j(\ell) \le i(\ell), \text{ where}\]
+\[j(\ell) = \begin{cases} 
+\ell + \left\lceil \frac{\ell}{k}\right\rceil + \left\lceil \frac{\ell}{k(k-1)}\right\rceil -3 & 0 < \ell \leq k(k-1)(k-2)\\
+j(\ell-C) + j(C)+3 & k(k-1)(k-2) < \ell
+\end{cases} \]
+with $C = k(k-1)(k-2)-k$.
+
+First, in Appendix~\ref{intuition}, we provide a rough outline of how this bound was originally achieved. Then, in Appendix \ref{formality} and \ref{bounding i}, we establish more general machinery to formally prove our bound, which is more suitable to apply to modifications of the problem, such as those mentioned in Section~\ref{further}.
+
+\section{A Path Transformation} \label{function}
+
+We consider a Hamiltonian path $P$ and a set of vertices $S$ such that for any $v \in S$ we have $(v \to \sigma(v)) \not \in E(P)$. We define a function $f$ returning a new graph, $f(P, S)=X$, as follows: 
+
+\vspace{1.75em}\dc{ use enumerate environment or algorithm environment (algorithm2e)}
+
+\textbf{Step 0:} Let $X$ start as a graph where $E(X) = E(P)$.
+
+\textbf{Step 1:} First, for $v \in S$, we remove $\out(P,v)$, and add the 1-edge $(v \to \sigma(v))$ to $E(X)$. 
+
+\textbf{Step 2:} Then, for any vertex $u$ such that $|\into(X,u)| = 2$, we remove the edge $\into(P,u)$ from $E(X)$. (i.e. we make it so the edges added in the previous step override the edges that $P$ had originally)
+
+\dc{Another thought: you can split step 1 into two steps or refactor, so it is either (1) add the 1-edge, (2) remove out-edges, (3) remove in-edges; or (1) add the 1-edge, (2) remove original edges until $X$ has only in-/out-degree $\le1$ vertices, which is to remove [this set of out-edges] and [this set of in-edges]. The benefit of doing this is that it is more obvious what the construction accomplishes and it makes Remark 1 more obvious.}
+
+\vspace{1.75em}
+
+We shall now make a number of useful remarks about $X=f(P,S)$\dc{, which will allow us to ...}.
+
+\vspace{1.75em}
+
+\begin{rmk} \label{degree rule} $\Conn(X)$ is a set of paths and directed cycles.
+\begin{proof}
+After step 1, each vertex has an out-degree of at most 1, and we do not add any new edges after this step. Then in step 2, we remove edges so that each vertex has in-degree at most 1. Thus, each vertex of $X$ has in-degree at most 1 and out degree at most 1. The remark now immediately follows.
+\end{proof}
+\end{rmk}
+
+\vspace{1.75em}
+
+Let $E_1$ be the edges removed in step 1, and $E_2$ be the edges removed in step~2. Let $I_X$ be the event that, $P[|P|]$, the only vertex $v$ where $\out(P,v) = \{\}$, is in $S$.
+
+\begin{rmk}\label{eqq}
+
+\[w(P) = w(X) + \sum_{e_1 \in E_1} (w(e_1)-1)-I_X + \sum_{e_2 \in E_2} w(e_2).\]
+
+\begin{proof}
+This follows from the construction of $X$. The first sum plus the term ``$-I_X$'' corresponds to the change of weight in step 1, and the second sum corresponds to the change in step 2.
+\end{proof}
+
+\end{rmk}
+
+
+\vspace{1.75em}
+
+We now define two new functions on graphs. We shall use these to identify subsets of $E_1$ and $E_2$, with which we can bound $w(P)$. 
+
+\textbf{Definition:}\dc{amsthm} We define the ``tails'' of a graph, $T(G)$, as the set of vertices $v \in G$, such that $\out(G,v) = \{\}$. Likewise, we define the ``heads'' of $G$, $H(G)$ as the set of vertices such that $\into(G,v) = \{\}$.
+
+\begin{rmk}\label{e2} $E_2 = \out(P,T(X)\setminus T(P))$
+\begin{proof}
+Note that the out-degree of each vertex, $v\not\in T(P)$, does not change in step 1. So, for $v \not \in T(P)$, $v$ has out-degree one after step 1. Thus, $v \in T(X)\setminus T(P)$ iff its out-edge, $e$, is removed in step 2. Since step 2 only removes edges that belonged to $P$, it follows that $e = \out(P,v)$.
+\end{proof}
+
+
+\end{rmk}
+
+\begin{rmk}\label{e1} $\into(P,H(X)\setminus H(P))$ is a subset of $E_1$.
+\begin{proof}
+If $v \in H(X)$, then either $v \in H(P)$, or $\into(P,v)$ was removed in step 1 or step 2.
+
+In step 2, we only remove edges $(u\to v)$, where $v$ had in-degree 2. Since $E_2$ is a subset of $E(P)$, no two edges in $E_2$ went into the same vertex, as $P$ is path. Thus $\into(P,v) \in E_2$ implies that $v$ has in-degree one in $X$, and thus $v \not \in H(X)$.
+
+Hence $\into(P,v)$ must be removed in step 1.
+\end{proof}
+\end{rmk}
+\noindent We note that the set described is exactly $E_1 \setminus \into(P,\{ \sigma(v): v \in S\})$. However this information was not used in our proof.
+
+\vspace{1.75em}
+
+
+\begin{lem} \label{weight rule} 
+
+\[w(P) \geq w(X) + \sum_{u \in \into(P,H(X)\setminus H(P))} (w(u)-1) -I_X + \sum_{v \in \out(P,T(X)\setminus T(P))} w(v)\] 
+\begin{proof}
+Combining Remarks~\ref{eqq}, \ref{e2}, and \ref{e1}, and noting that the summands of \linebreak $\sum_{e_1\in E_1} (w(e_1)-1)$ are all non-negative, the above immediately follows.
+\end{proof}
+
+\end{lem}
+
+\section{Constructing \texorpdfstring{$S$}{S} } \label{construction}
+
+\dc{amsthm}
+\textbf{Definition:} The \textit{1-cycle} of a vertex $v$, $c(v)$, is the set $\{v,\sigma(v),\sigma^2(v)\dots \sigma^{k-1}(v)\}$. This defines an equivalence class $\sim$, where $u \sim v \iff u \in c(v)$.
+
+\textbf{Definition:} Given a Hamiltonian path $P$ we say a vertex $v$ is the \textit{first in its cycle} if $v$ is the first vertex in $c(v)$ reached by $P$. We then denote $C_0$ as the set of vertices $v$ which are first in their cycles. We further denote $C_{-1}$ as the vertices $v$ such that $\sigma(v) \in C_0$.
+
+\vspace{1.75em}
+
+\dc{amsthm}
+\textbf{Construction:} Given a hamiltonian path $P$, we will define $S(P)$ as the set of vertices such that $v \not \in C_{-1}$ and $(v \to \sigma(v)) \not \in E(P)$. 
+
+\textbf{Definition:} With this construction, we define $F(P) = f(P,S(P))$.
+
+\vspace{1.75em}
+
+We will now state three properties of $F(P) = X$, which follow immediately and then show several more.\dc{ These properties will allow us to...}
+
+\vspace{1.75em}
+
+\begin{rmk} \label{Rule 1} For $v \in C_{-1}$, if $\out(X,v) \neq \{\}$ then $\out(X,v) = \out(P,v)$.\dc{ use ``tail''}
+\begin{proof}
+Since $v \not\in S(P)$, its out-edge is not replaced in step 1. Thus, either the out-edge is removed in step 2, in which case $\out(X,v) = \{\}$, or otherwise $\out(X,v) =\out(P,v)$.
+\end{proof}
+\end{rmk}
+
+\begin{rmk} \label{Rule 2} If $v \not \in C_{-1}$, then $\out(X,v) = (v \to \sigma(v))$.  
+
+\begin{proof} 
+If $\out(P,v)$ is a 1-edge, this is not changed when constructing $X$, and the result holds. Otherwise, we have that $v \in S(P)$, in which case its edge is replaced by a 1-edge in step 1, and this 1-edge is not removed in step 2, making the result hold.
+\end{proof}
+\end{rmk}
+Two statements which are logically equivalent to Remark~\ref{Rule 2}, but are useful to note are:
+
+\begin{rmk} \label{Rule 2.5} If $v \not \in C_0$, then $\into(X,v) = (\sigma^{-1}(v)\to v)$.
+\end{rmk}
+
+\begin{rmk}\label{Rule 2.75} For each 1-cycle, $c$, there is a path $p$ in $X$ consisting only of 1-edges which goes from $c\cap C_0$ to $c \cap C_{-1}$ which contains all the vertices $v \in c$.
+\end{rmk}
+
+\vspace{1.75em}
+
+\begin{rmk} \label{Rule 3} If $u \in C_{-1}$ and $\out(X,u) \neq \{\}$\dc{ tail}, then $\out(X,u) = (u \to v)$ for some $v \in C_0$. 
+\begin{proof}Remark \ref{Rule 1} implies $\out(X,u)= \out(P,u) = (u\to v)$. As this edge belongs to $P$, it follows that $u$ is reached before $v$ in $P$. 
+
+\vspace{.75em}
+
+By definition of $C_{-1}$, $u \in C_{-1} \implies \sigma(u) \in C_0$. By definition of $C_0$, $\sigma(u)$ is the first in its cycle. Thus, as $u \in c(\sigma(u))$, $\sigma(u)$ is reached before $u$ in $P$.
+
+\vspace{.75em}
+
+It then follows that $v\neq \sigma(u)$, as we already noted that $v$ is reached after $u$. Equivalently, we could say $\sigma^{-1}(v) \neq u$, which implies that $v \in C_0$ by Remark~\ref{Rule 2.5}.\end{proof}
+
+\end{rmk}
+
+
+
+\vspace{1.75em}
+
+We shall now make a observation on how a directed walk in $X$ progresses. 
+
+\begin{lem}\label{walking} Let $D$ be a directed walk in $X$.
+
+For $u,v \in C_0 \cup C_{-1}$, if $u$ is reached before $v$ in $D$, then $u$ is reached before $v$ in $P$.
+\begin{proof}
+
+It suffices to prove this when there is no intermediate $x \in C_0 \cup C_{-1}$ that is reached after $u$ but before $v$ in $D$, as the rest will then follow by the transitivity of order.
+
+\vspace{.75em}
+First, consider if $u \in C_0$. Then, by Remark~\ref{Rule 2}, we must follow a path of 1-edges until we reach a vertex in $v \in C_{-1}$. As we are using 1-edges, the path from $u$ to $v$ will not leave the 1-cycle $c(u)$. We then note that we will
+
+\vspace{.75em}
+Now, consider if $u \in C_{-1}$. By Remark~\ref{Rule 3} either $u$ has out-degree zero, or $\out(X,u) = (u \to v)$ for some $v \in C_0$. In the first case, the walk $D$ stops at $u$, so our claim vacuously holds. 
+
+Otherwise, we have that the out-edge of $u$ immediately takes us to $v \in C_0$. By Remark~\ref{Rule 1}, $(u \to v) \in E(P)$, thus we have that $u$ is also reached before $v$ in $P$.
+\end{proof}
+\end{lem}
+
+\vspace{1.75em}
+From this, we can deduce that 
+\begin{lem} \label{path rule} The components of $X$ are all paths.
+
+\begin{proof} By Remark~\ref{degree rule}, we must simply prove that $X$ contains no dicycle. \hide{Also by 3.1, we note that directed walks along $X$ are unique, meaning, that starting at a vertex, $v$, there is at most one sequence $v_1,v_2\dots v_i$, such that $v_1 = v$ and $(v_j \to v_{j+1}) \in E(X)$ for all $j$.}
+
+\vspace{0.75em}
+We will now proceed by contradiction. Suppose we have a dicycle, $D \in \Conn(X)$.
+
+\vspace{0.75em}
+By Remark~\ref{Rule 2.75} $D$ must contain vertex $u$ in $C_0 \cup C_{-1}$. Thus, as $D$ is a dicycle, there would be a directed walk from $u$ to itself. By Lemma~\ref{walking}, this would imply that $u$ is reached before itself in $P$, which cannot be true.
+\end{proof}
+\end{lem}
+
+\hide{
+\textbf{Proof:}\edit{ overly long and hard to follow}\dc{ Here's how I would prove it: (1) 1-cycles are followed in their entirety in $X$ due to the remarks above. (2) Thus you can define a $C_0$-like set for $X$, and this will be the same set as for $P$. (3) The in-edges for vertices in $C_0$ are the same in $X$ and $P$, since those are unchanged by the algorithm given our choice of $S$. (4) Thus if 1-cycles $a_1,a_2,\dots$ were to form a cycle in $X$, one of them, say $a_i$, must come first in $P$, but this is a contradiction since it was reached from cycle $a_{i-1}$ in $P$, too (taking the subscript modulo the length of the cycle). I'm not going to read your proof since skimming it, it seems more complicated than it needs to be.}
+As stated in Remark 3.1, we have that the in-degrees and out-degrees of $v \in V(X)$ are at most 1. Thus, it is sufficient to simply check that $X$ has no cycle.
+
+Suppose for sake of contradiction, that there was a cycle in $X$. Since each vertex in $X$ has at most outdegree 1, it then follows that there exists an infinite directed walk $T =v_0,v_1 \dots$ where $\out(X,v_j) = (v_j \to v_{j+1})$ for all $j \geq 0$. 
+
+\vspace{1.75em}
+
+For any given $v$, there exists $1\geq i\leq k$ such that $\sigma^i(v) \in C_0$, and thus $\sigma(\sigma^{i-1}(v)) \in C_0$, $0 \leq i-1 \leq k-1$. 
+
+For any $v_j \in T$, either $\sigma(v_j) \in C_0$, or $\sigma(v) \not \in C_0$ which will imply that $v_{j+1} = \sigma(v_j)$. Thus, starting at a vertex $v_j$, we have that $T$ will proceed:
+
+\[T= \dots v_j,\sigma(v_j),\sigma^2(v_j)\dots \sigma^{i-1}(v_j), v_{i+j} \dots\]
+where $\sigma(\sigma^{i-1}(v)) \in C_0$, and $i \leq k$. Obviously, $\sigma^{i-1}(v_j) \in c(v_j)$.
+
+Thus, there infinite $j'$ such that $\sigma(v_{j'}) \in C_0$. Now, since $\out(X,v_{j'}) \neq \{\}$, we must have that $\out(X,v_{j'}) = \into(P,v_{j'})$ by Remark 4.1, which means that $P^{-1}[v_{j'}] < P^{-1}[v_{j'+1}]$, since every edge in $P$ takes us to a new vertex in $P$. 
+
+Meanwhile, by Remark 4.2, we must also have that $v_{j'+1} \in C_0$. Choosing the smallest $j'' > j'$ such that $\sigma(v_{j''}) \in C_0$, we have that $v_{j''} \in c(v_{j'+1})$. Now, since $v_{j'+1} \in C_0$, we have that it was the first of its cycle, and was reached by $P$ before $v_{j''}$, meaning $P^{-1}[v_{j'+1}] < P^{-1}[v_{j''}]$.
+
+Hence, ordering the sequence of $j'$, $\sigma(v_{j'}) \in C_0$, as $j_1'<j_2' <\dots$, we have that $P^{-1}[v_{j_i'}] < P^{-1}[v_{j_{i+1}'}]$. Thus, we reach a contradiction, as $P$ has finite length, and an infinite sequence of $j'$ would imply that $P^{-1}$ gets arbitrarily large. $\blacksquare$
+}
+
+\begin{cor} \label{exitless rule} The connected components of $X$\dc{ I would replace all instances of $X$ around this lemma with $F(P)$, or else state explicitly that $X$ now always refers to $F(P)$, preferably still changing the symbol because you use $X$ to mean something different in previous sections.} are all strongly exitless paths. 
+
+\begin{proof} Given that $X$ is made up of paths, this comes immediately from Remark \ref{Rule 2}.\end{proof} 
+\end{cor}
+
+Extrapolating upon Lemma~\ref{walking}, when looking at a path $p \in \Conn(X)$, we provide what can be deduced about the order vertices appeared in $P$.   
+
+\begin{rmk} \label{ordering rule}Consider $p \in \Conn(X)$. For $v \in C_0\cup C_1$, if $v$ is reached before $u$ in $p$, then $v$ is also reached before $u$ in $P$.
+
+\begin{proof}
+Suppose for sake of contradiction that there exists a counterexample, $v \in (C_0 \cup C_{-1})\cap V(p)$ and $u \in V(p)$, such $p^{-1}[v]<p^{-1}[u]$ but $P^{-1}[v]>P^{-1}[u]$. 
+
+Since $p^{-1}$ is a finite total ordering on $V(p)$, for the given $u$ there must exists a maximal $v \in (C_0 \cup C_{-1})\cap V(p)$ with respect to $p^{-1}$ such that $u,v$ is a counterexample. By Lemma~\ref{walking}, WLOG, we may assume that there is not $v'$ that is reached in $p$ between $v$ and $u$, as we could take replace $v$ with $v'$ to get a larger counterexample with rest to $p^{-1}$. 
+
+ Case 1: If $v \in C_{-1}$, then either $v$ is the tail of $p$, or $\out(p,v) = (v \to v')$, and $v' \in C_0$, where $v'$ is visited after $v$ in $P$, as remarked in Lemma~\ref{walking}. For $v$ to be a maximal counterexample, we must have that $v'$ is not between $v$ and $u$, which implies $u = v'$. However, we have already noted that $v$ comes before $v'$ in $P$, as desired. Thus $v \in C_0$ cannot be a maximal counter-example.
+ 
+ 
+Case 2: If $v \in C_0$, then by definition, $P^{-1}[v] < P^{-1}[u]$ for all $u \in c(v) \setminus \{v\}$. By Remark~\ref{Rule 2.75}, we have that $p$ is continues from $v$ inside $c(v)$, until it reaches $u' = c(v) \cap C_{-1}$.  If $u = v'$ or $u$ is between $v$ and $v'$, we have that $u \in c(v) \implies P^{-1}[v] <P^{-1}[u] $.  Meanwhile $p^{-1}[v']< p^{-1}[u]$ means $v$ is not a maximal counterexample. Thus $v \in C_{-1}$ cannot be a maximal counter-example.
+
+Hence there is no counter-example, and the remark must hold.
+
+\end{proof}
+
+\hide{(this is a consequence of $v$ being the first reached in $c(v)$, first establishing this for the 1-cycle, and then by transitivity, as if we continue to visit another 1-cycle, we reach it with an edge $e \in E(P)$ from $u \in c(v) \cap C_{-1}$ to $v' \in C_0$, and $v$ comes before $u$ which comes before $v'$)} 
+
+\end{rmk}
+
+
+\dc{it is now clear to me from the proof technique of 5.1, but it absolutely does not follow from the lemma statement alone. I think it would be appropriate to make this a lemma or corollary since it is saying a lot, and give it a proper proof (which can heavily reference the definitions and techniques used in the proof of 5.1)}
+
+\vspace{1.75em}
+
+\begin{cor}\label{path first} For $p \in X$, we have that $p[1]$ is the first vertex in $p$ reached by $P$. \begin{proof}This is a consequence of Remark~\ref{ordering rule}.\end{proof}\end{cor}
+
+\vspace{1.75em}
+
+Now by partitioning $X$ into its connected components, we have
+
+\[H(X) = \bigcup_{p \in \Conn(X)} H(p) = \bigcup_{p \in \Conn(X)} \{p[1]\}.\]\edit{could try to better convey that this is true for any graph, and is not specific to $X$ }We remark that $H(P) \subseteq H(X)$, thus letting $H'(P) = H(X)\setminus H(P)$, we know $H'(P)$ is $H(X)$ with one element excluded, since $|H(P)| = 1$. Similarly we have $T(X) = \bigcup_{p \in \Conn(X)} \{p[|p|]\}$ and $|T(P) \cap T(X)| = 1-I_X$. Thus, letting $T'(P) = T(X)\setminus T(P)$, we note that $|H'(P)| = |\Conn(X)|-1 = |T'(P)|-I_X$.
+
+From Corollary~\ref{path first}, it follows that if $p[1] \neq P[1]$, then $\into(P,p[1]) = (u \to p[1])$ with $u \not \in p$, meaning $w(\into(P,p[1])) \geq \minto(p)$. Thus, we get the lower bound:
+
+\begin{align*}
+    \sum_{e \in \into(P,H'(P))} (w(e)-1) &\geq \sum_{\substack{p \in \Conn(X),\\ \text{s.t. } p[1] \in H'(P)}}(\minto(p)-1)\\
+    &\geq \minto(X) - (|\Conn(X)|-1).\\
+\end{align*}
+\dc{minto defined for graphs is a bit weird to me. I think it would be fine if (a) you made this two lines, so $LHS\le$[something with a sum][newline]$=$[something with minto] or (b) don't define minto for graphs and just use sums everywhere.}
+
+Meanwhile, for $v \in T'(P)$, we know that $w(\out(P,v)) \geq 2$, regardless of $S$\dc{ do you even need to say ``regardless of $S$,'' since you have an explicit $S$ you are using?}\zh{ I like to generalize if it doesn't really cost more effort}.*\dc{ make footnote or merge into body} We discuss getting sharper bounds in Section \ref{imp}, but for now we simply use the simple bound
+
+\[\sum_{e \in \out(P,T'(P))} w(e) \geq 2|T'(P)| = 2(|\Conn(X)|-1+I_X). \]
+
+*For $u \in S$, we require that $(u \to \sigma(u)) \not \in E(P)$, thus $\sigma(u)$ was not entered by a 1-edge. If $v \in T$, then $\out(P,v)$ goes into a vertex $x$, where $\sigma^{-1}(x) \in S$, which immediately implies $\out(P,v)$ is not a 1-edge.
+
+\vspace{1.75em}
+
+Thus by Lemma~\ref{weight rule}, and the non-negativity of $I_X$, we have
+
+\begin{align*} w(P) &\geq (|\Conn(X)|-1)+\minto(X)+w(X)+I_X\\
+&\geq (|\Conn(X)|-1)+\minto(X)+w(X).\end{align*}
+
+\section{Getting Bounds} \label{reductions}
+
+\subsection{Reducing to subproblems} \label{to subproblems}
+
+Defining $\mathcal{X}$ as the image of $F(P)$ over all Hamiltonian paths $P$, we get \textbf{Bound~1}\dc{ label/ref}:
+
+\[L(k) = \min_{P} \{w(P)\} \geq \min_{X \in \mathcal{X}} \{(|\Conn(X)|-1) + \minto(X) + w(X)\}.\]
+We postpone further examining $\mathcal{X}$ to the next section, instead turning our attention to proving our second bound. We will find it more convenient to expand the term $\minto(X)$, giving us:
+
+\begin{align*}
+    w(P) &\geq (|\Conn(X)|-1) + \minto(X) + w(X) \\
+    &= \sum_{p \in \Conn(X)} (w(p)+\minto(p)+1) - \max_{p \in \Conn(X)}\{\minto(p)+1\} \\
+    &= \min_{p^* \in X}\left\{w(p^*) + \sum_{p = X, p \neq p^*} (w(p)+\minto(p)+1)\right\}
+\end{align*}
+
+Since $\displaystyle \sum_{p \in X, p \neq p^*} |p| = k!-|p^*|$, we can get a lower bound of our sum, by getting a lower bound on the  ``average cost-to-length'' ratio of our summands. Specifically, letting $\displaystyle \mathcal{X}' = \bigcup_{X \in \mathcal{X}} \Conn(X)$, and $\displaystyle  R = \min_{p \in \mathcal{X}'}\{(w(p)+\minto(p)+1)/|p|\}$, we have that:\edit{ should probably specify that $p^*$ is fixed after being chosen in the top equation}\dc{ define $p^*$ outside, like ``let $p^*$ be the path which minimizes ...''}
+
+\begin{align*}
+    w(P)  &\geq \min_{p^* \in X}\left\{ w(p^*) + \sum_{p = X, p \neq p^*} w(p)+\minto(p)+1\right\}\\
+    &= w(p^*) + \sum_{p = X, p \neq p^*} \left(\frac{w(p)+\minto(p)+1}{|p|}|p|\right)\\
+    &\geq w(p^*) + \sum_{p = X, p \neq p^*} R |p|\\ 
+    &= w(p^*) + R(k!-|p^*|)
+\end{align*}
+
+Thus, we have \textbf{Bound 2}:
+
+\[ L(k) \geq \min_{p^* \in \mathcal{X}'}\left\{w(p^*) + R(k!-|p^*|) \right\} = Rk! + \min_{p^* \in \mathcal{X}'}\{w(p^*)-R|p^*|\} \]
+
+Hence, we are left to find a lower bound $r \leq R$, and a lower bound of $w(p^*) - r|p^*|$, which are our two subproblems.
+
+\subsection{Reducing the subproblems} \label{reducing subproblems}
+
+With this established, we can now turn to bounding our sub-problems in terms of $i(\ell)$, the smallest weight of an exitless path $p$ such that $|p|= \ell$. We will then use these reductions along with a bound on $i(\ell)$ to get Theorem 1. This bound is stated in Section~\ref{solving reduction}, and proven in the appendix.\edit{ ref}
+
+By Corollary~\ref{exitless rule}, if $p \in \mathcal{X}'$, then $p$ is strongly exitless. We remark that the reverse direction is also true, and that if $p$ is strongly exitless, then $p \in \mathcal{X}'$.\dc{ Just state that $\mathcal{X}'$ is exactly the set of strongly exitless paths, but do this in the previous section when you define $\mathcal{X}'$} For both subproblems, we first provide bounds for exitless paths pretending $\mathcal{X}'$ is the larger set which contains all exitless paths, and then remark that these bounds cannot be improved as the best exitless paths are strongly exitless anyways.
+
+
+\vspace{.75em}
+Optimizing $p^*$ is clear.
+\begin{red} Given $r > 1$, we have $\min_{p^* \in \mathcal{X}'}\{w(p^*)-r|p^*|\} = \min_{\ell}\{i(\ell)-r\ell\}$.
+\begin{proof}
+By definition of $i$, we have that \[w(p^*)-r|p^*| \geq i(|p^*|)-r|p^*| \geq \min_{\ell}\{i(\ell)-r\ell\}\] for any exitless path $p^*$. Also, as for each $\ell$ there exists an exitless path $p$ of length $\ell$ such that $w(p) = i(\ell)$, there must exist an exitless path $p'$ such that equality holds between the LHS and RHS when taking $p^*$ to be $p'$. 
+
+Now, we note that $p'$ will be a strongly exitless path, as if $p'$ were not strongly exitless, we could extend $p'$ by taking another 1-edge, giving a new exitless path $p''$. We have that $w(p'') -r|p''| = w(p')-r|p'|+1-r<w(p')-r|p'|$, which will contradict that $p'$ achieves the minimum value.  \end{proof}\end{red}
+
+\dc{ I would also suggest changing ``strongly exitless path'' to ``complete exitless path,'' since ``strongly'' is an adverb but isn't actually modifying the ``exitless'' part, so you should use an adjective instead. If you decide to change it, define ``complete'' entirely separately from ``exitless.'' This also saves you some words since often the distinction is just between exitless and strongly exitless, so you could say something like ``if it is also complete ...''}
+
+\vspace{.75em}
+Meanwhile, bounding $R$ is a little more work.
+\begin{red} $R \geq \min_{\ell > k}\{(i(\ell)-(k-1)+1)/(\ell-k) \}$
+\begin{proof}
+
+We note that for an exitless path, $p$, and $u \not \in p$, that there is an exitless path $p_u$ containing $u$ and $p$, such that $w(p_u) = w(p) + (k-1)+w(u\to p[1])$, which implies that $w(p)+\minto(p) = \min_{u \in V(S_k) \setminus V(p)}\{w(p_u)-(k-1)\}$. Explicitly: 
+
+\[p_u := \sigma^{-(k-1)}(u)\dots \sigma^{-1}(u), u, p[1],p[2]\dots p[|p|].\]
+It is clear that $|p_u| = |p|+k$, and that the set of $\{p_u: u \not \in p\}$ is the set of all exitless paths containing $p$ as their ending. Thus the union of all $p_u$ for all exitless paths $p$ of length $\ell-k$\dc{ and choice of $u$}, $\bigcup_p \bigcup_{u\not \in p} \{p_u\}$\dc{ don't need to write this in notation}, is the set of all exitless paths of length $\ell$.
+
+Thus, considering minimizing $(w(p)+\minto(p)+1)/|p|$, for the set of all exitless paths, we have
+
+\[\min_p\left\{\frac{w(p)+\minto(p)+1}{|p|}\right\} = \min_{p_u}\left\{\frac{w(p_u)-(k-1)+1}{|p_u|-k}\right\} = \min_{\ell > k}\left\{\frac{i(\ell)-(k-1)+1}{\ell-k} \right\}.\]
+As $\mathcal{X}'$ is a subset of all exitless paths, we have that $R \geq \min_{\ell > k}\{(i(\ell)-(k-1)+1)/(\ell-k) \}$. In fact, equality holds, as $p_u$ is strongly exitless iff $p$ is, and if $p_u$ is not strongly exitless, then we can take another 1-edge, which will lower the average weight and thus be a better path. \edit{ explain average weight a little more}
+\end{proof}
+\end{red}
+\hide{
+Bounding $R$ is a little more work. We note that for $p \in \mathcal{X}'$, and $u \not \in p$, that there is an exitless path $p_u$ containing $u$ and $p$, such that $w(p_u) = w(p) + (k-1)+w(u\to p[1])$, which implies that $w(p)+\minto(p) = \min_{u \in V(S_k) \setminus V(p)}\{w(p_u)-(k-1)\}$. Specifically: 
+
+\[p_u = \sigma^{-(k-1)}(u)\dots \sigma^{-1}(u), u, p[1],p[2]\dots p[|p|]\]
+It is clear that $|p_u| = |p|+k$, and that $\{p_u:\}$ thus we exactly have that $R = \min_{\ell > k}\{(i(\ell)-(k-1)+1)/(\ell-k) \}$.\dc{ explain how you get this last equation.} \review{I added ``exactly'' to clarify that this is sharp, but I think it sounds kinda awkward}
+
+We note since the paths of $X$ are strongly exitless, that we should include the restriction that $\ell$ is divisible by $k$ in our reductions. However, it will never be the case that an $\ell$ not divisible by $k$ will give a smaller value than $\ell+1$, thus the clarification is not really necessary. (the reason why is that taking a 1-edge always lowers your average weight, and thus should always be done, and we can always do so when $\ell$ is not divisible by $k$) \textbf{\edit{too dense; could be explained better}}}
+
+\subsection{Solving the reduction} \label{solving reduction}
+
+We define a function $j$ upon all positive integers that shall bound $i$ from above. Letting $C = k(k-1)(k-2)-k$, we let
+\[j(\ell) = \begin{cases} 
+\ell + \left\lceil \frac{\ell}{k}\right\rceil + \left\lceil \frac{\ell}{k(k-1)}\right\rceil -3 & 0 < \ell \leq k(k-1)(k-2)\\
+j(\ell-C) + j(C)+3 & k(k-1)(k-2) < \ell
+\end{cases} .\]In the appendix,\edit{ref} we prove:
+
+\textbf{Thm 2:}\edit{amsthm} $j(\ell) \leq i(\ell)$ for all $\ell$. Furthermore, $j(\ell) = i(\ell)$ for $0 < \ell \leq k(k-1)(k-2)$.
+
+To provide some intuition, $j(\ell)$ counts the weight of an optimistically greedy path, $g_\ell$. We start with $g_1$, a single vertex, and then go down this list of priorities to decide how to continue.
+
+\begin{enumerate}
+    \item If possible, $g_{\ell+1}$ tries to extend $g_\ell$ with the 1-edge $\sigma$\dc{$\sigma$ of something, since $\sigma$ is a function}, unless that visits a vertex already in $g_\ell$.
+    \item Otherwise, we try to extend $g_\ell$ with the 2-edge $\tau$\dc{ of something}\dc{ if doing so would not...}.
+    \item Otherwise, we try to extend $g_\ell$ with the 3-edge $\alpha$\dc{ of something} where $\alpha([1,2\dots k]) = [4\dots k, 3,2,1]$\dc{ if doing so would not...}.
+    \item Otherwise, we assume we can ``backtrack.'' We remove the last $k$ vertices we visited, pretend to use a ``magic'' 3-edge which takes us to an entirely new copy of $S_k$, where we will not worry about revisiting any vertices that were reached before the magic 3-edge. 
+    
+    This leaves us with a path $g'$ of length $\ell-k+1$. We will proceed to extend $g'$ by these 4 priority rules, until $g'$ has a length of $\ell+1$, at which point we will say $g_{\ell+1} = g'$.
+\end{enumerate} 
+
+It is easy to confirm that $w(g_\ell)= j(\ell)$ for $\ell \leq k(k-1)(k-2)$ because only rules 1, 2, and 3  will be used. It continues to be the case that $w(g_{\ell}) = j(\ell)$ for $\ell > k(k-1)(k-2)$, as we shall now show.
+
+\vspace{1.75em}
+The first backtracking step occurs after the first $k(k-1)(k-2)$ vertices, which after removing the last $k$ vertices, leaves us with a path of length $C$ with weight $w(g_C) = j(C)$. The magic 3-edge accounts for the ``$+3$'' term in the definition of $j$. After the first magic 3-edge, since we do not have to worry about the vertices visited before this point, it's identical to as if we started with $g_1$ and stopped $C$ vertices early, hence the weight after this point is equal to $w(g_{\ell-C})$ which by induction will be equal to $j(\ell-C)$.
+
+\vspace{1.75em}
+In the appendix,\edit{ ref} we prove that it impossible for an exitless path $p,\,|p| = \ell$ to have less weight than $g_\ell$, thus giving Theorem 2\edit{ ref}.
+%further manipulation of above; not useful as is, should strive for another form
+\hide{
+We may simplify the second case by noting that $j(C) +3 = C +C/k + (C+k)/k(k-1)$. Thus, with $q = \lceil (\ell-k(k-1)(k-2))/C\rceil$, we have
+\[
+    j(\ell-C) + j(C)+3 = \ell + \left\lceil \frac{\ell}{k}\right\rceil + \left\lceil \frac{\ell+qk}{k(k-1)}\right\rceil -3\]
+. We letting $f_2,f_3$ be what is added to the 2nd/3rd term when the ceiling is taken, we have:
+
+\[j(\ell) = \ell\left(1+ \frac{1}{k} + \frac{1}{k(k-1)}\right) + f_2+f_3-3\]}
+
+%old version
+\hide{
+For $0 < \ell \leq k(k-1)(k-2)$, letting $r_1 = \lceil \ell/k \rceil, r_2 = \lceil \ell/(k(k-1)) \rceil$\dc{ Suggestion: $r_1=\ell$, $r_2=$ your current $r_1$, $r_3=$ your current $r_2$, so the subscript matches the edge weight that the term corresponds to. Change def'n of $j$ accordingly. Food for thought mostly; right now the subscript matches the cycle weight so it still works}, we let $j(\ell) = \ell + r_1+ r_2 -3$.\dc{ Why this definition? This is a completely unmotivated definition, and it is absolutely not clear why you are doing this with the way it is written currently.}
+
+Then, for $t > 0$, we let $a_t = t(k(k-1)(k-2)-k)$\dc{ Suggestion: $a=k(k-1)(k-2)-k$, then use $ta$ (i.e. the subscript isn't doing anything complicated so there's no need to incorporate it in $a$, and it will be more obvious the relationship you are representing)}. Within the interval $a_t + k < \ell \leq a_t + k(k-1)(k-2)$\dc{ remove the first instance of ``for $t>0$'' and add here ``for all positive integer $t$'' or similar}, we let $j(\ell) = j(\ell-a_t)+j(a_t)+3$.
+
+\dc{I think the longer explanation would be better with some reworking. If I understand correctly, your $j$ definition starts with just being the exact value of $i$ for small $\ell$ (derived from greedily using the lowest edge possible up to when you need to use a 4-edge, if I understand correctly), and you extend by taking 3-edges (hence the $+3$ in the recurrence relation above). }}
+%old version w/ a little more explanation, but I think reads worse
+\hide{
+For $0 < \ell \leq k(k-1)(k-2)$, letting $r_1 = \lfloor \ell/k \rfloor, r_2 = \lfloor \ell/(k(k-1)) \rfloor$, we have that $i(\ell) = \ell-1 + r_1 -1 + r_2 -1$. This can be done by using the 1-edge $\sigma$, unless it goes to a previously seen vertex, other wise using $\tau$, and then otherwise using the 3-edge $\alpha$, which transforms $\alpha([1,2\dots k]) = [4\dots k, 3,2,1] $.
+
+In this range, we let $j(\ell) = i(\ell)$.
+
+Then, for $t > 0$, we let $a_t = t(k(k-1)(k-2)-k)$. Within the interval $a_t + k < \ell \leq a_t + k(k-1)(k-2)$, we let $j(\ell) = j(a_t)  +i(\ell-a_t)+3$. 
+
+Intuitively, here's what's going on. Let $p$ be the of length $k(k-1)(k-2)$ achieved by following our described greedy strategy. If we wanted to continue along $p$, we'd have to use a 4+-edge to reach a new vertex. Instead using such an expensive edge, we would prefer to backtrack, changing the last 2-edge into 3-edge, causing us to lose a 1-cycle, hence the $-k$, and incurring a cost of 3-edge, hence the $+3$. With this concession, we then pretend we can proceed optimally, and do not worry about revisiting any of the vertices visited before this concession.}
+
+With this established we can finally solve the subproblems of Section~\ref{to subproblems}. As a reminder, subproblem 1 is to find $R = \min_{p \in \mathcal{X}'}\left\{\frac{w(p)+\minto(p)+1}{|p|}\right\}$, the minimal ``cost per vertex'' of a path not containing $H(P)$; and subproblem 2 is to find how much we can minimize the ``cost'' caused by, $p^*$, the path which does contain $H(P)$. In Section~\ref{reducing subproblems}, we rephrased these two subproblems as simple minimization problems in terms of $i(\ell)$, which we will now solve using Theorem 2.\edit{ref} This allows us to get Theorem 1, our lower bound of $L$.\edit{ ref}
+
+ We shall now proceed to outline how we solved these two subproblems. The gist of the argument works the same for both. We first give a simplified outline, and then elaborate on how one would prove part~\ref{claim 2}.
+ 
+ \vspace{1.75em}
+ 
+We consider an analogous subproblem where we replace $i(\ell)$ with $j(\ell)$.
+
+\begin{enumerate}
+    \item\label{claim 1} First, we simply considered the interval up to $k(k-1)(k-2)$, finding that taking $\ell = k(k-1)(k-2)$ was best. (i.e. gives the smallest value\dc{ of what?})
+
+\item\label{claim 2}  We then considered optimizing the intervals $tC+k < \ell \leq (t+1)C+k$ with $t \geq 1$, according to our lower bound of $i$, and concluded that taking $\ell$ to be the largest value in the interval, $(t+1)C+k$, gives the smallest value\dc{ of what?}. (the proof of this is given below)\dc{ don't parenthesize this sentence}
+
+\item Comparing the optimal $\ell$'s for all intervals, we concluded that they all gave the same value\dc{ of what?}. (which is readily seen using induction)\edit{ handling parentheticals}  Thus, taking $\ell$ to be $k(k-1)(k-2)$ gives the smallest value when evaluating with $j$.
+
+\item Finally, since $j(\ell)=i(\ell)$ along the interval up to $k(k-1)(k-2)$, we are able to remark equality. This means taking $\ell$ to be $k(k-1)(k-2)$ gives the smallest value when evaluating with $i$ as well, recalling $i(\ell) \le j(\ell)$ for all $\ell$.\edit{ phrasing could be better}
+\end{enumerate}
+\hide{
+ First, we simply considered the interval up to $k(k-1)(k-2)$, finding that taking $\ell = k(k-1)(k-2)$ was best. (i.e. gives the smallest value)
+
+We then considered optimizing the intervals $tC+k < \ell \leq (t+1)C+k$ with $t \geq 1$, according to our lower bound of $i$, and concluded that taking $\ell$ to be the largest value in the interval, $(t+1)C+k$, gives the smallest value. (*) 
+
+Comparing the optimal $\ell$'s for all intervals, we concluded that they all gave the same value. (which is readily seen using induction)\edit{ handling parentheticals; clarifying that they are equal when evalutating according to the lower bound}  Thus, taking $\ell$ to be $k(k-1)(k-2)$ gives the smallest value when evaluating with $j$.
+
+Finally, since $j(\ell)=i(\ell)$ along the interval up to $k(k-1)(k-2)$, we are able to remark equality. This means taking $\ell$ to be $k(k-1)(k-2)$ gives the smallest value when evaluating with $i$ as well.}
+
+
+\vspace{1.75em}
+We now elaborate on how we reach the conclusion stated in part~\ref{claim 2}, that taking $\ell$ to be $(t+1)C+k = tC+k(k-1)(k-2)$, the largest it can be in its interval, gives the best option in its interval. We consider each of the two subproblems.
+
+\textbf{Subproblem 1:} $\min \{(j(\ell)-k+2)/(\ell-k) : tC+k <\ell\leq  (t+1)C+k\}$ 
+
+\hide{
+This case comes naturally from Farey addition, which is defined as $\frac{a}{b} \oplus \frac{c}{d} = \frac{a+c}{b+d}$. A known fact is that if $\frac{a}{b}< \frac{c}{d}$ for nonnegative integers $a$ and $c$ and positive integers $b$ and $d$, then $\frac{a}{b} < \frac{a}{b} \oplus \frac{c}{d} < \frac{c}{d}$. We also have that $\oplus$ is commutative and associative.
+
+ It is also the case that $\oplus$ satisfies a form of cancelation. Specifically, if $\frac{a}{b} < \frac{c}{d}$ for positive integers $a,b,c,d$, then $\frac{a'}{b'} \oplus \frac{c}{d} < \frac{a}{b} \oplus \frac{c}{d}$, if $ \frac{a'}{b'} < \frac{a}{b}$, $a' > a$ and $b'  > b$. (this can be derived by letting $\frac{a'}{b'} = \frac{(1+\epsilon_1) a}{(1+\epsilon_1 +\epsilon_2) b }$ with $0 < \epsilon_1, \epsilon_2 $, which means $\frac{a'}{b'} \oplus \frac{c}{d} = \frac{0}{\epsilon_2 b} \oplus \left(\frac{\epsilon_1a }{\epsilon_1b} \oplus \left( \frac{a}{b}\oplus \frac{c}{d}\right)\right)$, and noting that the terms are decreasing right-to-left)\edit{ need to explain better; technically does not state that $\frac{a'}{b'} = \frac{a}{b}$ gives the same result, even though this is also implied, by forgetting about the $\frac{0}{b\epsilon_2}$ part}
+
+We then have by the definition of $j(\ell)$, that $ \frac{j(\ell)-(k-1)+1}{\ell -k} = \frac{j(\ell-a_t) +3+j(a_t)-(k-1)+1}{(\ell-a_t) +a_t -k} = \frac{j(\ell-a_t)+3}{\ell-a_t} \oplus \frac{j(a_t)-(k-1)+1}{a_t-k}$, where the second term is constant, and $\ell-a_t = \ell'$ is in the interval, $k < \ell' \leq k(k-1)(k-2)$. Then, we simply confirm that $\frac{c}{d} = \min_{k <\ell'\leq k(k-1)(k-2)} \{ \frac{j(\ell')+3}{\ell'} \}$ is achieved when $\ell' = k(k-1)(k-2)$, and that $\frac{j(a_t) -(k-1)+1}{a_t-k} > \frac{c}{d}$.\edit{ using $\frac{c}{d}$ is unpleasant}\zh{ gotta make sure I split the Farey addition properly!}
+
+\edit{explain why last two claims are true}}
+
+Within the interval $tC+k< \ell \leq (t+1)C+k$, letting $\ell' = \ell-tC$, we have that
+
+\begin{align*}
+    j(\ell) -j(\ell')&= t(j(C)+3) \\
+    &= tC + t\left\lceil\frac{C}{k}\right\rceil +\left\lceil\frac{C}{k(k-1)}\right\rceil  \\
+    &= tC + t\frac{C}{k} + t(k-2)\\
+    &= tC\left(1 + \frac{1}{k}+\frac{1}{k(k-1)}\right) +\frac{t}{k-1}\\
+\end{align*}
+
+Thus, with $\Delta(\ell') :=j(\ell')-\ell'\left(1 + \frac{1}{k}+\frac{1}{k(k-1)}\right) $, we have
+
+\[j(\ell) = \ell\left(1 + \frac{1}{k}+\frac{1}{k(k-1)}\right) + \frac{t}{k-1} + \Delta(\ell').\]
+
+Explicitly expressing $\Delta(\ell')$, we have
+
+\begin{align*}
+    \Delta(\ell') &= (\ell'-\ell')+\left(\left\lceil\frac{\ell'}{k}\right\rceil -\frac{\ell'}{k}\right)+ \left(\left\lceil\frac{\ell'}{k(k-1)}\right\rceil-\frac{\ell'}{k(k-1)}\right)-3\\
+    &= 0 + \frac{\ell' \pmod{k}}{k} +\frac{\ell' \pmod{k(k-1)}}{k(k-1)} -3\\
+    &= 0 + r_2 + r_3 -3.\\
+\end{align*}(defining $r_2$ and $r_3$ to be the second and third terms of the line above)
+\edit{kind of want to cut out the second line with the modulos, and just immediately give $r_2,r_3$}\dc{ do you define $r_2$ and $r_3$ before now? Also, you can cut the ``0+'' from the beginning of the last line, and I would recommend making your own mod command since spacing is weird on pmod} 
+
+\vspace{.75em}
+
+We then have
+\begin{align*}
+    \frac{j(\ell)-k+2}{\ell-k} &= \left(1 + \frac{1}{k}+\frac{1}{k(k-1)} \right) +\frac{\left(k+1+\frac{1}{k-1}\right) +\frac{t}{k-1} + \Delta(\ell') -k +2}{\ell-k}\\
+    &= \left(1 + \frac{1}{k}+\frac{1}{k(k-1)} \right) +\frac{\frac{t+1}{k-1} + \Delta(\ell') +3}{\ell-k}\\
+    &= \left(1 + \frac{1}{k}+\frac{1}{k(k-1)} \right) +\frac{\frac{t+1}{k-1} + r_2+r_3-3+3}{\ell-k}\\
+    &= \left(1 + \frac{1}{k}+\frac{1}{k(k-1)} \right) +\frac{t+1}{(k-1)(\ell-k)} +\frac{ r_2+r_3}{\ell-k}\\
+\end{align*}
+\dc{again, don't need so many steps}\zh{ agreed, need to smoosh two steps into an intermediate one}
+
+Finally, we can see that taking $\ell'$ to be $k(k-1)(k-2)$ minimizes $(j(\ell)-k+2)/(\ell-k)$. In fact, each of the three terms in the final line are minimized. (the first is constant; second term is always decreasing and thus minimal as we chose the largest value for $\ell'$; third term $r_2$ and $r_3$ are both made zero and cannot be smaller) Hence we are done. 
+
+\vspace{.75em}
+We note that an alternate and perhaps more natural proof can be done by using properties of ``Farey Addition'', also referred to as taking mediants, which is defined as $\frac{a}{b}\oplus \frac{c}{d} = \frac{a+c}{b+d}$. Primarily one relies on the fact that if $f < g$, for two fractions with positive numerators and denominators, then $f < f \oplus g < g$.\dc{ maybe put this in a footnote and/or appendix}\zh{ footnote seems reasonable}
+
+\vspace{1.75em}
+\textbf{Subproblem 2:} $\min \{ j(\ell)-R\ell : tC+k <\ell\leq  (t+1)C+k\}$
+
+Again letting $\ell' = \ell - tC$, we have that $j(\ell) = t(j(C)+3) +j(\ell')$. Thus,
+
+\begin{align*}
+    j(\ell)-R\ell &= t(j(C)+3) +j(\ell') - R(tC+\ell')\\
+    &= (t(j(C)+3) - RtC) + (j(\ell') - R\ell').
+\end{align*} 
+
+ Since the first term is constant, we are left to minimize the second. By part~\ref{claim 1}\dc{ using ``step'' is confusing (reminds of the algorithm to construct $g_\ell$, not the previous claims). I would give the claim a name (lemma, proposition, whatever) to make it easier to backref}, we have that taking $\ell'$ to be $k(k-1)(k-2)$ is minimal, and we are done.
+
+\vspace{1.75em}
+
+From the work above, we see that $R = (i(\ell_1)-(k-1)+1)/(\ell_1-k)$, by taking $\ell_1$ to be $k(k-1)(k-2)$.
+
+Then, letting $r=R$\dc{ Then what was the point in using $r$ at all? Just use $R$!}\zh{ yeah I should do this}, we have that $i(\ell_2)-r\ell_2$ is minimized by taking $\ell_2$ to be $k(k-1)(k-2)$.
+
+So, using this information with Bound 2, we get:
+
+\textbf{Thm\dc{amsthm, or at the very least write out ``theorem''} 1}:
+
+\begin{align*}
+    L(k) &\geq i(\ell_2)+\frac{i(\ell_1)-k+2}{\ell_1-k}(k!-\ell_2)\\
+    &= k^2(k-2) -3 +\frac{(k^2-1)(k-2)-3}{k(k-1)(k-2)-k}(k!-k(k-1)(k-2))\\
+    &= k! + (k-1)! +(k-2)! + \frac{k!}{(k-1)((k(k-1)(k-2)-k)} + O(1)\\
+\end{align*}
+
+\hide{*The reason for this is that our bound pretends that in the interval $a_t +k < \ell \leq a_t + k(k-1)(k-2)$, $a_t = t(k(k-1)(k-2)-k)+k$, that we have a fixed initial cost $j(t)$, followed by a path $p_f$ of weight $i(\ell-a_t)$. Here, we find that letting $p_f$ be a 3-cycle is again optimal, which corresponds to letting $\ell$ take the largest value in the interval. The reason for why a 3-cycle is optimal here is roughly that it optimizes $w(p)/|p|$ for $k<|p|\leq k(k-1)(k-2)$, and then by properties of farey addition, it is the best way to optimize $\frac{j(t)+w(p)}{a_t+|p|}$.\dc{ Literally none of this reasoning makes sense given the machinery and terminology you have established so far. What is $j$? What is a 3-cycle? What is the meaning of ``optimal'' (or it is optimal compared to what)? What do you mean ``roughly''? What is farey (probably should be capitalized) addition? Why are we optimizing that particular quantity?}}
+
+We remark that the method used easily generalizes to provide a bound for path coverings of $S_k$ with $N$ paths. 
+
+WLOG we may assume that the $N$ paths are disjoint, as $w(x\to y)+w(y\to z) \le w(x \to z)$ for all $x,y,z \in S_k$. Now, we number our paths, $P_1,P_2\dots P_N$. We let $P^*$ denote the hamiltonian path achieved by starting with the edges $E(P_1) \cup E(P_2) \dots E(P_N)$ and then adding an edge from the tail of $P_i$ to the head of $P_{i+1}$ for $1\le i< N$. We define $C_0$ by saying $v$ is first in its cycle if it is the vertex of $c(v)$ reached by $P^*$.
+
+
+%smoother explanation but less explanatory
+\hide{
+$\dagger$ We outline how we reached these conclusions. First, we by considered optimizing the intervals $t(k(k-1)(k-2)-k)+k < \ell \leq (t+1)(k(k-1)(k-2)-k)+k$, $t \geq 1$, according to our lower bound of $i$, and concluded that taking $\ell = (t+1)(k(k-1)(k-2)-k)+k$ was best. 
+
+We then simply considered the interval up to $k(k-1)(k-2)$, finding that taking $\ell = k(k-1)(k-2)$ was best. Comparing to the optimal $\ell$'s in across intervals, we concluded that they all gave the same value. 
+
+Finally, since our bound is tight along the interval up to $k(k-1)(k-2)$, we are able to remark equality for these two bounds. (meaning with the current reductions, this bound is tight, and cannot be improved)}
+
+\section{Future Ideas}
+
+\subsection{Improving our bounds} \label{imp}
+
+We mention several way through which one can improve the bounds achieved from our methods. In particular, it would be quite fruitful to improve the bound of:
+
+\[ \sum_{v\in T} w(\out(P,v)) = \sum_{p \in X} w(\out(P,p[|p|])) \]
+
+One such way to better understand $w(\out(P,p[|p|]))$, is to consider the order that vertices are visited in $P$, as was done for the sum along $S^*$ to show that $w(\into(P,p[1])) \geq \minto(p)$. 
+
+\textbf{Improvement 1:} \label{rough} Let $U_p$ be the set of vertices in $p$ which we know come before $T(p)$, which is in $C_{-1}$, according to Remark~\ref{ordering rule}. We know that $\out(P,T(p)) \neq (T(p) \to u), u \in U_p$, thus $w(\out(P,p[|p) \geq \min(w(p[|p|] \to v), v\not \in U_p$. 
+
+This idea alone can rule out the 2-edge $\tau$ in some cases, but is not able to rule out the possibility of the other 2-edge, $\sigma^2$, which while seeming ridiculous, could potentially appear in a Hamiltonian path of minimal weight. As it is impossible to strengthen Remark~\ref{ordering rule} for general Hamiltonian paths, one might consider this a dead end.
+
+However, there is still hope. We are actually able to rule out the possibility of $\sigma^i, i > 1$ ever being an edge. We are able to do this by showing for any path $P$ containing such an edge, that we can create a path $P'$ without that edge which as at most as much weight as $P$.
+
+\textbf{Remark:} We assume $w(v \to v'') = w(v \to v') + w(v' \to v'')$. If $(v\to v'') \in E(P)$, then there exists a hamiltonian path $P'$, $(v \to v'') \not \in E(P')$, such that $w(P) \geq w(P')$.
+
+\textbf{Proof:} We assume that $(v \to v''), (x \to v'), (v' \to y) \in E(P)$. (if $\into(P,v') =\{\}$ or $\out(P,v') = \{\}$, the argument proceeds in the same manner)
+
+We construct $P'$ by replacing these three edges with $(v \to v'),(v'\to v''), (x \to y)$. By the assumption of our remark, we have that $w(v\to v'') = w(v \to v') + w(v' \to v'')$. Meanwhile, for any three vertices, $a,b,c$, we have that $w(a\to c) \leq w(a\to b) + w(b\to c)$.
+
+Hence it follows that $w(P') \leq w(P)$. $\blacksquare$
+
+Noting the fact that $w(v \to \sigma^i(v)) = i = w(v \to \sigma(v)) + w(\sigma(v)\to \sigma^{i-1}(v))$, we can sequentially replace all such edges until we no longer have any edges $\sigma^i, i > 1$. We call a hamiltonian path $P$ \textit{reduced} if it has this property.\edit{ use the word reduced a lot}
+
+\textbf{Improvement 2:} \label{refined} We consider $X = F(P)$, when $P$ is reduced. For $p \in \Conn(X)$, we reuse the definition of $U_p$ from Improvement 1. If $\tau(p[|p|]) \in U_p$, then $w(\out(P,p[|p|])) \geq 3$.
+
+Using improvement~\ref{refined} actually improves our bound. If we consider analagous sub-problems to those defined in Section~\ref{to subproblems}, we find that the paths described in Section~\ref{solving reduction} are such that $\tau(p[|p|]) \in U_p$. This implies our bound is not strict. However, further analysis is required to actually pull a better bound from this. 
+
+Specifically, we need to establish a tighter bound for $i(\ell)$, so that $\ell$ can't get arbitrarily large and have the same ratio as before. How we would go about this is discussed more in appendix XX.\edit{ insert this in somewhere} All in all, it gets a bit messy, as we cannot make as a stronger reduction than in Section~\ref{reducing subproblems}, thus, we have to grasp at special cases to identify where Improvement~\ref{refined} changes things.\edit{ clarify}
+
+%below is wrong p sure
+\hide{
+Unfortunately, improvement 2 is still not sufficient to improve the lower bound. Solving analagous subproblems to those established in 5.1, we may reuse the solutions provided in 5.3 to get the same bound. (however, we now have that $\ell_1$ now has only one solution, as the larger values now have an additional weight)}
+
+Meanwhile, a dream scenario would be if we could reduce ourselves to only considering paths with the following property: if $v \in C_{-1}$, then $v$ is the last vertex in $c(v)$ reached by $P$. We then have that $T(p)$ is the last vertex reached in $P$, meaning $w(\out(P,p[|p|])) \geq \min_{u\not \in p} w(p[|p|] \to u) := \minout(p)$.
+
+We can then reduce the problem of finding $\min_{p \in \mathcal{X}'}\{(w(p)+\minto(p)+\minout(p)-1)/|p|\}$ much like was done in Section~\ref{reducing subproblems}. If the vertex before $H(p)$ and the vertex after $T(p)$ are in different 1-cycles, then the average weight of $p$ is at least $\min_{\ell > 2k} \{(i(\ell)-2(k-1)-1)/(\ell-2k)\} $. Meanwhile, if the vertex before $H(p)$ and the vertex after $T(p)$ share a common 1-cycle, then the average weight is in terms of ``almost exitless cycles,'' although the exact phrasing of what an almost exitless cycle is a bit of a mouthful. If we can ensure that $P^{-1}[v]  <P^{-1}[\sigma(v)] < P^{-1}[\sigma^2(v)] \dots < P^{-1}[\sigma^{k-1}(v)]$ for $v \in C_0$, things become a little nicer, and we can say the average is at least $\min_{\ell > k} \{(f(\ell)-k+1)/(\ell-k)$ where $f(\ell)$ is the minimum weight of a cycle $C$ with $\ell$ vertices in which each $C$ uses $k-1$ 1-edges in each 1-cycle it visits. 
+
+It is unclear how easy it will be to establish bounds concerning the second case involving almost exitless cycles. However, based off the first case, taking $\ell$ to be $k(k-1)(k-2)$, we at best can achieve a lower bound of the form
+
+\[ L(k) \geq k!+(k-1)!+(k-2)! + \frac{2k!}{(k-1)(k(k-1)(k-2)-2k)} + O(k^3)\]
+without other techniques.
+
+\subsection{Further applications} \label{further}
+
+We believe it is would also be interesting to solve 
+
+\begin{itemize}
+    \item Random model of $S_k$. I believe it would be manageable to get decent bounds on models where the weights of edges in 1-cycles have change according to some probablity space.
+    \item Fixed modifications of $S_k$, where we remove some edges. For example, if we consider the case in which we only have the edges $\sigma$ and $\tau$, we immediately get that Greg Egan's upper bound is tight within an error of $1+1/(k-2)$. (In other literature it has shown to be absolutely tight in this case.)\edit{ maybe cite this result}
+    \item Other subgraphs of the De Brujin graph
+    \item Weighted pancake graph
+\end{itemize}
+
+\section{Acknowledgements}
+
+Special thanks to Daniel Carter, for not only introducing me to the superpermutation problem, and collaborating on related work, but also offering so much useful feedback on organizing this paper.
+
+\newpage
+
+\appendix
+
+\section{A justification} \label{intuition}
+
+\rough{FIRST BOUND} Right off the bat, we shall establish $i(k,k(k-1)+1)$ to be $(k(k-1)+1)-1 + (k-1) + 1$, which is associated with completing a 2-cycle and then leaving it.\edit{ 2-cycle not established} We know that for every vertex except the first, we use a 1+-edge, after each $k$ vertices we must switch 1-cycles, requiring a 2+-edge, and for every $(k-1)$ 2+-edges, at least one needs to reach a new 2-cycle, requiring a 3+-edge, since we cannot use 2+-edges until we finish the 1-cycle we entered.\edit{ could make more concise} Thus, the optimal path is quite simplistic and greedy. For longer paths, the optimal scenario would be this:\edit{ should say this earlier, illustrates my point well and is readable}
+
+\begin{enumerate}
+    \item Use 1-edge unless that would go to a previously visited vertex
+    \item Otherwise, use a 2-edge to go to the next 1-cycle, unless that 1-cycle has already been visited in the path
+    \item Otherwise, use a 3-edge to go to a new 2-cycle. In this best case scenario, we assume this takes us to a new 2-cycle has no 1-cycles that have previously been visited, allowing us to use as many 2-edges as possible before we need a new 3-edge.
+\end{enumerate}
+
+This is very clearly as optimal as an exitless path can be. This would be the case if $i(k,\ell)-max(i(k,a)+i(k,b+1), a+b=\ell, a > 0) = 0, \forall \ell > k(k-1)+1$. Now, we prove that such a strategy does not work for paths, $p, |p| > k(k-1)(k-2)$.
+
+\vspace{1.75em}
+
+\rough{Rotational notation, dealing with 2-cycles and the like}
+
+We consider that we at the end of a 2-cycle in our path, meaning that if you did a 2-edge you'd be in a previously reached 1-cycle.\edit{ can be formalized by lemmas of 4.1} If the current permutation we are at is ``$a_k,a_{(k-1)},a_1, a_2 \dots a_{(k-2)}$", then, using the rotational notation Aaron Williams paper, the permutations of ``$a_1,a_2\dots  a_{(k-1)} \sim a_k$" have all been reached, meaning that if we insert $a_k$ anywhere in ``$a_1,a_2\dots  a_{(k-1)}$", we are in a previously visited 1-cycle. To explain this more properly, if we start at permutation ``$a_1,a_2\dots  a_k$", using 1-edges we keep rotating these letter, moving the front letter to the end, until we reach ``$a_k, a_1 \dots  a_{(k-1)}$", at which a 1-edge would repeat ourselves, and instead use a 2-edge, reaching ``$a_2,a_3 \dots  a_{(k-1)},a_1,a_k$", where ``$a_k$" is still at the end but ``$a_1,a_2\dots a_{(k-1)}$" has rotated once. Completing a 2-cycle, starting at ``$a_1,a_2\dots a_k$", you reach ``$a_k,a_{(k-1)},a_1, a_2 \dots  a_{(k-2)}$", at which point a 2-edge leads you back to where you started.\edit{ Rotational notation can be introduced better, or maybe avoided altogether; should be more concise/broken apart}
+
+\vspace{1.75em}
+
+\rough{3-edge shenanigans} From here, we have 3! possible 3-edges to use, each of which append a permutation of ``$a_k,a_(k-1),a_1$"  to the end of ``$a_2,a_3\dots  a_(k-2)$":
+
+\begin{itemize}
+    \item 3 of these 3-edges go to a permutation already reached in the 2-cycle, this occurs specifically when we arrange ``$a_k,a_(k-1),a_1$" in such a way that ``$a_(k-1)$" precedes ``$a_1$". When this is the case, the letters ``$a_1,a_2\dots  a_(k-1)$" is still in rotational order, so we  immediately end up in a previously visited 1-cycle, which is significantly worse than the optimal case where we can do a 2-cycle and only reach new 1-cycles.
+    \item 2 more of these share a 1-cycle with our current 2-cycle, namely those that don't end with ``$a_k$". If we end with ``$a_1$", then ``$a_(k-1)$" precedes ``$a_1$", and as stated before, we immediately reach a previously visited 1-cycle. If we end with ``$a_{(k-1)}$", then things are more subtle. We are now starting a 2-cycle from ``$a_2,a_3\dots  a_{(k-2)}, (a_1,a_k or a_k,a_1), a_{(k-1)}$". As you go along the 2-cycle completing 1-cycles, we consider the permutations reached immediately after each 2-edge, in this sequence, ``$a_{(k-1)}$" stays fixed at the end, as the rest of the letters rotate, moving the first letter to the second-to-last place. With (k-3)-th 2-edge, this rotation will move ``$a_{(k-2)}$" from being the first letter of our permutation, to being the second-to-last letter. With this, the rotation order ``$a_1,a_2\dots  a_{(k-1)}$" is achieved, meaning we have reached a 1-cycle that was already covered in the last 2-cycle.
+\end{itemize}
+
+This leaves us with only one 3-edge that can possibly entertain doing a ``perfect" 2-cycle from where we've started, which is the only way to achieve the lower bound cost. With this 3-edge, the end is arranged like so: ``$a_1,a_{(k-1)},a_k$", which takes us to this permutation: ``$a_2,a_3\dots a_{(k-2)},a_1,a_{(k-1)},a_k$". This too, creates another rotational cycle. I said the current permutation we are at is ``$a_k,a_{(k-1)},a_1, a_2 \dots  a_{(k-2)}$", which is reached if you do a full 2-cycle starting from ``$a_1,a_2,\dots  a_{(k-2)},a_{(k-1)},a_k$". So, if we do a full 2-cycle, and then use this specific 3-edge, we go from ``$a_1,a_2,\dots  a_{(k-2)},a_{(k-1)},a_k$" to ``$a_2,a_3\dots a_{(k-2)},a_1,a_{(k-1)},a_k$", this leaves the last two letters first, and rotates the remaining, taking the first letter and moving it to the third-to-last place. Thus, if we tried to achieve the efficiency of our lower bound by repeatedly doing a full 2-cycle, and then using this 3-edge, we'd end up back where we started when we used the (k-2)-th 3-edge. Thus, there is a limit. Additionally, if we complete the (k-2)-th 2-cycle, we are at the permutation ``$a_k,a_{(k-1)},a_{(k-2)},a_1\dots  a_{(k-3)}$", meaning that any 3-edge will preserve the order ``$a_1,a_2\dots  a_{(k-3)},a_{(k-2)}$", meaning all 3-edges will go to an old 1-cycle, so we cannot do (k-2) complete 2-cycles and reach a new 1-cycle via any three edges.
+
+By the lemma of section 4.1, we have two options:\edit{ we will actually establish multiple lemmas}
+
+\begin{enumerate}
+    \item Use a 4+-edge after $(k-2)$ complete 2-cycles, which yields paths, $p, |p| =< c(k)(k-1)(k-2)$, $w(p) = c(k)(k-1)(k-2)-1 + c(k-1)(k-2)-1 + c(k-2)-1 + c-1$
+    \item Use a 3-edge instead of a 2-edge in the second-to-last 1-cycle of your (k-2)-th 2-cycle, which yields paths, $p, |p| = c((k)(k-1)(k-2)-1)$, $w(p) = c((k)(k-1)(k-2)-1)-1 + c(k-1)(k-2)-1 + c(k-2)-1$
+\end{enumerate}
+When considering the ``average weight" of a path, $\frac{w(p)}{|p|}$, both strategies are worse than our best case scenario. Of the two, the second option should never have more weight, after the path is longer than $k(k-1)(k-2)$, though equality for some lengths $\ell, k(k-1)(k-2) < \ell < 2k(k-1)(k-2)$, when the second 4+-edge has not yet been used.
+
+
+\section{Indulgence in generalities} \label{formality}
+
+\subsection{Further Notation} \label{notation}
+
+\textbf{Definitions:}
+
+\textbf{Heads and Tails:} We define the ``heads'' and ``tails'' of paths. For a path $p$, and $i \in [1,|p|]$ we let $p_i^+ = p^i = (p[1],p[2]\dots p[i])$, $p_i^- = p^{-i} = (p[i], p[i+1]\dots p[|p|])$.\edit{ second form maybe more confusing than useful}
+
+
+We note that $E(p) = E(p_i^+)\cup E(p_i^-)$, thus, when these edge sets have no intersection, $w(p) = w(p_i^+)+w(p_i^-)$.\edit{ this clarification feels distracting, maybe define $E(p)$ as a multiset?}
+
+We define the partial weight of a path, $w(p,i) = w(p^i)$, $i \in [-|p|,|p|] \setminus \{0\} $.
+
+\vspace{1.75em}
+
+\textbf{Statement:} For the rest of this section consider a general digraph $G$, with directed weight $\omega: E(G) \to \mathbb{R}$.\edit{ awkward transition of generality, I use $w$ in previous definitions but am using $\omega$ now...}
+
+\vspace{1.75em}
+
+\textbf{Path family:} 
+
+A \textit{path family} of $G$, is a set of paths, $Y$, such that for $p \in Y$, we have that $p_i^+ \in Y,p_i^- \in Y$ for all $i \in [1,|p|]$. We call this property \textit{closure of heads and tails}, or just ``closure'' for short. 
+
+For a family, we shall use $Y_\ell$ to denote $\{ p \in Y : |E(p)| = \ell\}$.
+
+\vspace{1.75em}
+
+\textbf{Functions on families:}
+
+For a path family $Y$, we define $l(\ell) =  \min^*\{\omega(p): p \in Y_\ell\}$, where $\min^*$ of the empty set is evaluated as $\infty +$. Recursively, we define $l_1(\ell) = l(\ell), l_{i+1}(\ell) = \min^*\{ \omega(p) > l_i(\ell): p \in Y_\ell\}$.\edit{ decide whether I'm cool letting $Y$ be implicit}
+
+\rough{NOT DONE WITH BELOW SECTION}
+
+\subsection{Useful Lemmas} \label{lemmas}
+
+\textbf{Remark:} We then have that for $p \in Y_\ell, a \in [1,\ell]$, that the following holds: $\omega(p) \geq \omega(p,a)+l(\ell-a+1)$.
+
+This is because after going from $p[1]$ to $p[a]$, which has weight $\omega(p,a)$, we then continue with a path $p' = (p[a], p[a+1] \in p[\ell])$. By property 2 of path families, we have  $p' \in Y_{\ell-a+1}$, thus $\omega(p') \geq l(\ell-a+1)$. $\blacksquare$
+
+\textbf{Corolarry:} $l(\ell) \geq l(a) + l(\ell-a+1), a \in [1,\ell]$
+
+We may also deduce by property 2 of path families, that $p[1], p[2] \dots p[a] \in Y_a$. Thus $\omega(p,a) \geq l(a)$, for $p \in Y_\ell$. Thus, $\min^*_{p\in Y_\ell}\{\omega(p)\} \geq l(a) +l(\ell-a+1)$. $\blacksquare$
+
+\vspace{1.75em}
+
+\textbf{Definition:} A path, $p \in Y_\ell$is considered \textit{perfect}, if for $a \in [1,\ell]$, $w(a$
+
+\textbf{Lemma:}
+
+\vspace{1.75em}
+
+\textbf{Lemma:} Let us suppose that for all $p \in Y_t$, that $\omega(p,t-1) = l(t-1) \implies \omega(p) > l(t) \implies \omega(t) \geq l_2(t)$. It follows that $p \in X_\ell, \ell = t+r, r \geq 1$, that either:
+
+\begin{enumerate}
+    \item $\omega(p,t-1) = l(t-1) \implies \omega(p,t) \geq l_2(t) \implies \omega(p) \geq l_2(t) + l(r+1) = L_1$
+    \item $\omega(p,t-1) > l(t-1) \implies \omega(p,t-1) \geq l_2(t-1) \implies \omega(p) \geq l_2(t-1)+ l(r+2) = L_2$
+\end{enumerate}
+
+Hence it follows that $l(\ell) \geq \min\{L_1,L_2\}$ under these conditions. $\blacksquare$\edit{ clean out the excessive logic; make lemma result more clear}
+
+We remark that we can achieve a more general result with this argument, that $\omega(p,t-i) = l(t-i) \implies \omega(p) \geq l_2(t) \implies l(t+r) \geq \min \{ L'_1, L'_2\}$, with $L'_1 = l_2(t) + l(r+1), L'_2 = l_2(t-i)+l(r+1+i)$. However this is not necessary for our purposes.\edit{ placement; maybe just merge with above}
+
+\vspace{1.75em}
+
+What this essentially means, is that if the best paths of length $t-1$, does not lead to the best paths of length $t$, then assuming a best-case scenario, we may consider if we used the second best option at one of these steps and proceeded optimally.\edit{ probably rewrite a reconsider where this is placed}
+
+\section{On Exitless Paths} \label{bounding i}
+
+\subsection{Length of Exitless Paths}
+
+We will now define a path family $Y$ on a graph $S'_k$, which is related to exitless paths on $S_k$.
+
+\vspace{1.75em}
+
+We let $Z_\ell$ be the set of exitless paths of length $\ell$ on $S_k$. We create $S'_k$ such that $V(S'_k) = V(S_k)$, and for $p \in Z_{k+1}$, $(p[1]\to p[k+1]) \in E(S'_k), w'(p[1]\to p[k+1]) = w(p)$, and then let $Y_i = \{(p[1], p[k+1]\dots p[(i-1)k+1]), p \in Z_{(i-1)k+1}\}$.\edit{ dense/cluttered; technically already used $w'$ before}
+
+It is easily verified that $Y$ is a path family of $S'_k$. Throughout this section, functions such as $l(\ell)$ will be with respect to this defined $Y$.\edit{ last sentence is pedantic and off-putting to me} 
+
+\vspace{1.75em}
+
+We define $i(\ell) = \min^* \{ w(p), p \in Z_{\ell}\}$. We clearly have that $i(nk+1 +r) = l(n)+r, 0 \leq r \leq k-1$. 
+
+We now establish the binary relation, $\sim$, where $u \sim v$, iff $u = \sigma^i(v)$ for some $i$.\edit{ maybe should remark that this is a 1-cycle} It is easily confirmed that $\sim$ is an equivalence relation. We remark that for $u,v \in p \in Y_\ell \in Y$, $u\sim v$ holds iff $u = v$.\edit{ I wanna just write $p \in Y$, maybe reconsider notation of path families, or establish this as an abuse of notation}
+
+We will say an edge $(u\to v) \in E(S'_k)$ is a $W$-step, if $w'(u\to v) = (k-1)+W$. A $W$-step corresponds to exiting a 1-cycle via a $W$-edge.\edit{ have not defined 1-cycles} 
+
+We will denote the 2-step as $\tau' = \tau \circ \sigma^{k-1} = \tau \circ \sigma^{-1}$.\edit{ does it make more sense to use $\tau'$ or a new letter; is the $\sigma^{-1}$ useful?} We have that $\tau'([1,2\dots (k-1),k]) = [2,3\dots (k-1),1,k]$.
+
+\vspace{1.75em}
+
+Looking at the transformation, we have that $\tau'$ ``rotates'' the first $k-1$ letters by $1$, and fixes the last character, $k$. From this observation, it is quite clear that $\tau'^{k-1}(v) = v$. 
+
+We then define a \textit{2-cycle} at $v$ as $\{v, \tau'(v), \tau'^2(v) \dots \tau'^{k-2}(v)\}$. This has all rotations of the first $(k-1)$ letters of $v$.\edit{ prove/explain, reference Williams paper}
+
+\rough{$l(k-2) = k-3, l_2(k-2) = k-2, l(k-1) = k-1$}\edit{ requires editing $w'$}
+
+
+\rough{LEMMA SETUP}\textbf{Remark:} For $\ell = (k-2)(k-3)$, if $p \in Y_{\ell}$, then $w(p) = l(\ell)$ iff $p \cong p' = (\alpha \circ \tau'^{k-2})^{k-3}$\edit{ define $\alpha, \cong$, and writing a path like that}
+
+\vspace{1.75em}
+
+We have that $p' = (\alpha \circ \tau'^{k-2})^{k-3}$ is a simple path, and that $w'(p') = (k-3)l(k-1)+l(k-2) \leq l(\ell)$. Hence, $l(\ell) = w'(p')$.\edit{ show/explain the cycle}
+
+\vspace{1.75em}
+
+\rough{SHOW $p \ncong p' \in Y_\ell, w(p') > p$}
+
+Since $\alpha$ is the only 3-step which can be followed by $(k-2)$ 2-steps, there
+$\blacksquare$
+
+
+
+
+\section{Further Ideas}
+
+Currently, I am only considering $\minto(p)$. However, one could also consider $minout(p)$, which is the smallest weight of an edge which takes you outside of $p$. It would be a bit messy, because there's possibilities of using 1-edges and what not, but I believe it would work. You would then bound it something like $min( \left(\sum_p 1+max( \minto(p), minout(\phi(p))) \right) - max( 1+max(\minto(p),minout(\phi(p))) )$ for all bijections $\phi: X \to X$. Correction, there should not be edges between the first and last vertices of any two paths, such and edge would not be removed, thus we would instead have the term $\sum_p (\minto(p) + minout(p) -1) - max(\minto(p))-max(minout(p))+1$. Thus, one must remove the last 1-cycle of each exitless path or have their $minout$ be 3. With this improvement, we have to start dealing with how long one can efficiently drag out exitless paths, as $\frac{w(p) + 4}{|p|}$ and $\frac{w(p)+3}{|p|-k}$ both will asymptotically approach $\frac{w(p) + 3}{|p|}$, if we were able to infinitely use early 3-edges as described. (actually, from tests on my computer, it seems that the very first early 3-edge re-intersects, so this is actually quite promising)
+
+
+Different idea:
+
+Currently, all these exitless paths use the specific 3-edge which allows us to make the most out of our 2-cycles. As was alluded to in the appendix, if we consider the path of first permutation we reach in each 1-cycle, using a 2-edge after finishing a 1-cycle acts like a 1-edge on the first $(k-1)$ letters, and the preferred 3-edge acts like a 2-edge on the first $(k-1)$ letters. I believe this might be like the  Thus, if we restrict ourselves to only using 1-edges, 2-edges and our ``preferred'' 3-edge, our paths in $X$ behave like paths on $(k-1)$ letters. Basically, the paths of $X$ would be partitioned into $k$ sets of paths on $S_{k-1}$. If we could prove that this cannot work out optimally, meaning that these paths can't all be disjoint, this opens the floodgates for a lot of further improvements. The techniques of this paper are not very useful, as each set of paths would not visit all the vertices of $S_{k-1}$. Basically we have ourselves a really complicated set covering problem.
+
+\section{Outline of Section 3}
+
+With Section 2, we prove that there is an inequality between a set of exitless paths. The main point is that exitless paths are quite greedy, predictable, and wasteful. It seems that at other's such as Robin Houston, were aware of the fact that exitless paths cannot indefinitely enter 2-cycles without overlap. For those unfamiliar, this is explained (poorly) in Section 4.
+
+Then section 3 proves bounds on $\frac{w(p) + 1+ \minto(p)}{|p|}$, to find the optimal ``average'' weight of any such exitless path in such a covering. (plus factoring in the one path which contains the beginning of our Hamiltonian path, which has the average weight of $\frac{w(p)}{|p|}$) Using just this, we get a nice bound, as with the smallest $\minto$ value, 2, the average ratio $\frac{w(p)+3}{|p|}$ we at least get the 4chan bound. Then, actually restricting ourselves to paths where $\minto(p)=2$, we must do worse, as we must not fully complete our first 2-cycle, else we could not enter the path with a 2-edge.
+
+Upon further consideration, I realize we can additionally factor in a term like $minout(p)$, denoting the cost of leaving the end of each path. This is discussed rather loosely in Section 5.
+
+\section{Improving the lower bounds of \texorpdfstring{$i(\ell)$}{i(l)}}
+
+As mentioned in Section~\ref{further}, finding a better lower bound for $i(\ell)$ would be a big step towards getting a stronger bound of $L(k)$ with our methods. We discuss how one might go about deriving bounds for $i(\ell)$.
+
+4-edge case:
+\begin{itemize}
+    \item 
+\end{itemize}
+
+Backtracking: 
+\begin{itemize}
+    \item overlap with last 2-cycle
+    \item strategy yeilds approximately $j'$ (describe)
+\end{itemize}
+
+Alternate 3-edge types
+\begin{itemize}
+    \item 
+\end{itemize}
+
+\end{document}
